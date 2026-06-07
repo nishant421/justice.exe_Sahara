@@ -1,14 +1,8 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Anthropic from "@anthropic-ai/sdk";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-export const geminiFlash = genAI.getGenerativeModel({
-  model: "gemini-2.0-flash",
-  generationConfig: {
-    temperature: 0.7,
-    maxOutputTokens: 1024,
-  },
-});
+const MODEL = "claude-haiku-4-5-20251001";
 
 export const SYSTEM_PROMPT = `You are Sahara (सहारा), a compassionate AI-powered legal first responder for survivors and witnesses of child abuse (POCSO), workplace sexual harassment (POSH), and related violations in India.
 
@@ -86,28 +80,33 @@ Then and only then continue with support.
 
 Remember: You may be the first person this individual has ever told. The way you respond in the next few seconds shapes whether they feel safe enough to continue. Lead with your heart.`;
 
-
 export type ConversationMessage = {
   role: "user" | "model";
   parts: { text: string }[];
 };
 
+export const anthropicClient = anthropic;
+
 export async function chat(
   messages: ConversationMessage[],
   legalContext?: string
 ): Promise<string> {
-  const model = geminiFlash;
-
   const systemWithContext = legalContext
     ? `${SYSTEM_PROMPT}\n\nRELEVANT LEGAL CONTEXT (cite when appropriate):\n${legalContext}`
     : SYSTEM_PROMPT;
 
-  const chat = model.startChat({
-    history: messages.slice(0, -1),
-    systemInstruction: systemWithContext,
+  const anthropicMessages = messages.map((m) => ({
+    role: m.role === "model" ? ("assistant" as const) : ("user" as const),
+    content: m.parts[0]?.text || "",
+  }));
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: systemWithContext,
+    messages: anthropicMessages,
   });
 
-  const lastMessage = messages[messages.length - 1];
-  const result = await chat.sendMessage(lastMessage.parts[0].text);
-  return result.response.text();
+  const block = response.content[0];
+  return block.type === "text" ? block.text : "";
 }

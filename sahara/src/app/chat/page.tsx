@@ -52,13 +52,12 @@ function ChatContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setSpeechSupported("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
-      synthRef.current = window.speechSynthesis;
     }
   }, []);
 
@@ -86,30 +85,33 @@ function ChatContent() {
   }, [messages]);
 
   const speak = useCallback(
-    (text: string) => {
-      if (!voiceEnabled || !synthRef.current) return;
-      synthRef.current.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = language === "hi" ? "hi-IN" : "en-IN";
-      utterance.rate = 0.9;
-      utterance.pitch = 1.05;
-
-      const voices = synthRef.current.getVoices();
-      const preferred = voices.find(
-        (v) => v.lang === (language === "hi" ? "hi-IN" : "en-IN") && v.name.toLowerCase().includes("female")
-      ) || voices.find((v) => v.lang === (language === "hi" ? "hi-IN" : "en-IN"));
-      if (preferred) utterance.voice = preferred;
-
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-      synthRef.current.speak(utterance);
+    async (text: string) => {
+      if (!voiceEnabled) return;
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      try {
+        setIsSpeaking(true);
+        const res = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        if (!res.ok) throw new Error("TTS failed");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
+        audio.onerror = () => setIsSpeaking(false);
+        await audio.play();
+      } catch {
+        setIsSpeaking(false);
+      }
     },
-    [voiceEnabled, language]
+    [voiceEnabled]
   );
 
   const stopSpeaking = () => {
-    synthRef.current?.cancel();
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     setIsSpeaking(false);
   };
 

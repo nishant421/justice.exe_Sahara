@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildActionPlan } from "@/lib/action-plan";
 import { classifyCase } from "@/lib/classify";
-import { geminiFlash } from "@/lib/gemini";
+import { anthropicClient } from "@/lib/gemini";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,14 +13,20 @@ export async function POST(req: NextRequest) {
 
     const category = classifyCase(conversationText);
 
-    // Ask Gemini to summarize the situation
     let situationSummary = "A person reached out to Sahara seeking guidance and support.";
     try {
-      const model = geminiFlash;
-      const result = await model.generateContent(
-        `Based on this conversation, write a 2-3 sentence neutral, empathetic summary of the situation WITHOUT identifying information. Focus on the type of concern raised.\n\nConversation:\n${conversationText.slice(0, 2000)}\n\nSummary:`
-      );
-      situationSummary = result.response.text().trim();
+      const response = await anthropicClient.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 256,
+        messages: [
+          {
+            role: "user",
+            content: `Based on this conversation, write a 2-3 sentence neutral, empathetic summary of the situation WITHOUT identifying information. Focus on the type of concern raised.\n\nConversation:\n${conversationText.slice(0, 2000)}\n\nSummary:`,
+          },
+        ],
+      });
+      const block = response.content[0];
+      if (block.type === "text") situationSummary = block.text.trim();
     } catch {
       // fallback to default
     }
