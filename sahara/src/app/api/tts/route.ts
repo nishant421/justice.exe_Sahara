@@ -23,11 +23,14 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const chunks: Buffer[] = [];
-    for await (const chunk of audioStream) {
-      chunks.push(Buffer.from(chunk));
+    const reader = (audioStream as ReadableStream<Uint8Array>).getReader();
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
     }
-    const audio = Buffer.concat(chunks);
+    const audio = Buffer.concat(chunks.map((c) => Buffer.from(c)));
 
     return new NextResponse(audio, {
       headers: { "Content-Type": "audio/mpeg" },
