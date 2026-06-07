@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sahara",
+      "runtimeExecutable": "C:\\Users\\2511j\\Desktop\\Sahara Rhett\\start-sahara.bat",
+      "runtimeArgs": [],
+      "port": 3000,
+      "autoPort": false
+    }
+  ]
+}
