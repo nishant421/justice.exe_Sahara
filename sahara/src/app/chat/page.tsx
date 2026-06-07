@@ -87,7 +87,11 @@ function ChatContent() {
   const speak = useCallback(
     async (text: string) => {
       if (!voiceEnabled) return;
-      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      // Stop any in-progress audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+      }
       try {
         setIsSpeaking(true);
         const res = await fetch("/api/tts", {
@@ -98,10 +102,12 @@ function ChatContent() {
         if (!res.ok) throw new Error("TTS failed");
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audioRef.current = audio;
+        // Reuse the same Audio element to stay within Chrome's autoplay policy
+        if (!audioRef.current) audioRef.current = new Audio();
+        const audio = audioRef.current;
+        audio.src = url;
         audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
-        audio.onerror = () => setIsSpeaking(false);
+        audio.onerror = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
         await audio.play();
       } catch {
         setIsSpeaking(false);
@@ -111,7 +117,7 @@ function ChatContent() {
   );
 
   const stopSpeaking = () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
     setIsSpeaking(false);
   };
 
