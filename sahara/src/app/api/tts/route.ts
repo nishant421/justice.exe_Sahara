@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
     const audioStream = await client.textToSpeech.convert(voiceId, {
       text,
-      modelId: "eleven_multilingual_v2",
+      modelId: "eleven_turbo_v2_5",
       voiceSettings: {
         stability: 0.5,
         similarityBoost: 0.75,
